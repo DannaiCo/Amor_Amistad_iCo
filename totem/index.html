@@ -1,0 +1,663 @@
+<!doctype html>
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+
+        <meta
+            name="viewport"
+            content="width=600, height=1440, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+        <!-- Alphabet Soup Pro -->
+        <link rel="stylesheet" href="https://use.typekit.net/vsp7vcb.css" />
+
+        <title>Cuenta regresiva</title>
+
+        <style>
+            /* ==========================================================
+           RESET GENERAL
+        ========================================================== */
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html,
+            body {
+                width: 600px;
+                height: 1440px;
+
+                min-width: 600px;
+                max-width: 600px;
+
+                min-height: 1440px;
+                max-height: 1440px;
+
+                overflow: hidden;
+
+                margin: 0;
+                padding: 0;
+
+                background: transparent;
+
+                font-family: "alphabet-soup-pro", sans-serif;
+                font-weight: 400;
+                font-style: normal;
+            }
+
+            /* ==========================================================
+           ESCENARIO PRINCIPAL
+        ========================================================== */
+
+            #stage {
+                position: relative;
+
+                width: 600px;
+                height: 1440px;
+
+                min-width: 600px;
+                max-width: 600px;
+
+                min-height: 1440px;
+                max-height: 1440px;
+
+                overflow: hidden;
+            }
+
+            /* ==========================================================
+           VIDEO DE FONDO
+        ========================================================== */
+
+            #backgroundVideo {
+                position: absolute;
+
+                left: 0;
+                top: 0;
+
+                width: 600px;
+                height: 1440px;
+
+                object-fit: cover;
+
+                z-index: 0;
+
+                pointer-events: none;
+            }
+
+            /* ==========================================================
+           CONFIGURACIÓN GENERAL DE LOS GRIDS
+
+           Cada elemento tiene su grid independiente.
+
+           left   = posición horizontal
+           top    = posición vertical
+           width  = ancho disponible
+           height = alto disponible
+        ========================================================== */
+
+            .grid-element {
+                position: absolute;
+
+                display: grid;
+
+                align-items: center;
+                justify-items: center;
+
+                overflow: hidden;
+
+                z-index: 2;
+            }
+
+            /* ==========================================================
+           GRID 1
+           NÚMERO DE DÍAS
+        ========================================================== */
+
+            #grid-number {
+                left: 95px;
+                top: 306px;
+
+                width: 412px;
+                height: 230px;
+            }
+
+            #daysNumber {
+                /*
+            ==========================================================
+            CONTROL DE FUENTE DEL NÚMERO
+
+            Modifica únicamente estos dos valores.
+            JavaScript los leerá automáticamente.
+            ==========================================================
+            */
+
+                --font-min: 80px;
+                --font-max: 200px;
+
+                color: #df394d;
+
+                font-family: "alphabet-soup-pro", sans-serif;
+                font-weight: 400;
+                font-style: normal;
+
+                line-height: 0.9;
+
+                text-align: center;
+
+                white-space: nowrap;
+
+                display: inline-block;
+            }
+
+            /* ==========================================================
+           GRID 2
+           PALABRA DÍA / DÍAS
+        ========================================================== */
+
+            #grid-days {
+                left: 160px;
+                top: 523px;
+
+                width: 297px;
+                height: 100px;
+            }
+
+            /* ==========================================================
+           PASTILLA DE DÍA / DÍAS
+        ========================================================== */
+
+            #daysPill {
+                width: 100%;
+                height: 100%;
+
+                display: flex;
+
+                align-items: center;
+                justify-content: center;
+
+                overflow: hidden;
+
+                padding: 5px 16px;
+
+                background: #f1688a;
+
+                border-radius: 174px;
+            }
+
+            #daysLabel {
+                /*
+            ==========================================================
+            CONTROL DE FUENTE DÍA / DÍAS
+            ==========================================================
+            */
+
+                --font-min: 35px;
+                --font-max: 80px;
+
+                color: #fce0dd;
+
+                font-family: "alphabet-soup-pro", sans-serif;
+                font-weight: 400;
+                font-style: normal;
+
+                line-height: 1;
+                letter-spacing: 5px;
+
+                text-align: center;
+
+                white-space: nowrap;
+
+                display: inline-block;
+            }
+
+            /* ==========================================================
+           GRID 3
+           FRASES
+
+           Es completamente independiente de los otros grids.
+        ========================================================== */
+
+            #grid-phrase {
+                left: 30px;
+                top: 685px;
+
+                width: 540px;
+                height: 385px;
+            }
+
+            #phrase {
+                /*
+            ==========================================================
+            CONTROL DE FUENTE DE LAS FRASES
+            ==========================================================
+            */
+
+                --font-min: 60px;
+                --font-max: 150px;
+
+                width: 100%;
+
+                color: #df394d;
+
+                font-family: "alphabet-soup-pro", sans-serif;
+                font-weight: 400;
+                font-style: normal;
+
+                line-height: 1.05;
+
+                text-align: center;
+
+                text-transform: uppercase;
+
+                white-space: normal;
+
+                overflow-wrap: normal;
+
+                word-break: normal;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="stage">
+            <!-- ==========================================================
+         VIDEO DE FONDO
+    ========================================================== -->
+
+            <video id="backgroundVideo" autoplay muted loop playsinline preload="auto">
+                <source src="fondo.mp4" type="video/mp4" />
+            </video>
+
+            <!-- ==========================================================
+         GRID INDEPENDIENTE 1
+         NÚMERO
+    ========================================================== -->
+
+            <div id="grid-number" class="grid-element">
+                <span id="daysNumber"> 0 </span>
+            </div>
+
+            <!-- ==========================================================
+         GRID INDEPENDIENTE 2
+         DÍA / DÍAS
+    ========================================================== -->
+
+            <div id="grid-days" class="grid-element">
+                <div id="daysPill">
+                    <span id="daysLabel"> DÍAS </span>
+                </div>
+            </div>
+
+            <!-- ==========================================================
+         GRID INDEPENDIENTE 3
+         FRASE
+    ========================================================== -->
+
+            <div id="grid-phrase" class="grid-element">
+                <div id="phrase">PARA DESCUBRIR TU AMIGO SECRETO</div>
+            </div>
+        </div>
+
+        <script>
+            /* ================================================================
+   CONFIGURACIÓN
+================================================================ */
+
+            const TARGET_MONTH = 9;
+
+            const TARGET_DAY = 19;
+
+            /*
+    60000 ms = 60 segundos
+*/
+
+            const PHRASE_INTERVAL = 60000;
+
+            const phrases = [
+                "PARA DESCUBRIR TU AMIGO SECRETO",
+
+                "PARA CONFESAR TU AMOR A ESA PERSONA ESPECIAL",
+
+                "PARA RECUPERAR ESA AMISTAD PERDIDA",
+
+                "PARA MEJORAR TUS RELACIONES CERCANAS",
+
+                "PARA DESCUBRIR EL AMOR EN ESA AMISTAD",
+
+                "PARA ARMAR PARCHE Y CELEBRAR",
+
+                "Para tener una excusa para celebrar",
+
+                "Para convertir un día normal en un día especial",
+
+                "Para endulzar a tu novio",
+
+                "Para endulzar a tu novia"
+            ];
+
+            /* ================================================================
+   ELEMENTOS HTML
+================================================================ */
+
+            const daysNumber = document.getElementById("daysNumber");
+
+            const daysLabel = document.getElementById("daysLabel");
+
+            const daysPill = document.getElementById("daysPill");
+
+            const numberGrid = document.getElementById("grid-number");
+
+            const phraseGrid = document.getElementById("grid-phrase");
+
+            const phraseElement = document.getElementById("phrase");
+
+            /* ================================================================
+   OBTENER FECHA DE BOGOTÁ
+================================================================ */
+
+            function getBogotaDateParts() {
+                const formatter = new Intl.DateTimeFormat(
+                    "en-CA",
+
+                    {
+                        timeZone: "America/Bogota",
+
+                        year: "numeric",
+
+                        month: "2-digit",
+
+                        day: "2-digit"
+                    }
+                );
+
+                const parts = formatter.formatToParts(new Date());
+
+                const date = {};
+
+                parts.forEach((part) => {
+                    if (part.type === "year" || part.type === "month" || part.type === "day") {
+                        date[part.type] = Number(part.value);
+                    }
+                });
+
+                return date;
+            }
+
+            /* ================================================================
+   CALCULAR DÍAS RESTANTES
+================================================================ */
+
+            function calculateRemainingDays() {
+                const today = getBogotaDateParts();
+
+                const todayUTC = Date.UTC(
+                    today.year,
+
+                    today.month - 1,
+
+                    today.day
+                );
+
+                const targetUTC = Date.UTC(
+                    today.year,
+
+                    TARGET_MONTH - 1,
+
+                    TARGET_DAY
+                );
+
+                const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+                let days = Math.round((targetUTC - todayUTC) / millisecondsPerDay);
+
+                /*
+        Nunca mostrar números negativos.
+    */
+
+                days = Math.max(0, days);
+
+                return days;
+            }
+
+            /* ================================================================
+   LEER TAMAÑO DE FUENTE DESDE CSS
+
+   Ejemplo:
+
+   --font-min: 20px;
+   --font-max: 42px;
+
+================================================================ */
+
+            function getCSSFontValue(element, variable) {
+                const styles = getComputedStyle(element);
+
+                const value = styles.getPropertyValue(variable).trim();
+
+                return parseFloat(value);
+            }
+
+            /* ================================================================
+   AUTOAJUSTE DE TEXTO
+
+   El tamaño mínimo y máximo NO están definidos aquí.
+
+   Se leen directamente desde CSS:
+
+   --font-min
+   --font-max
+
+================================================================ */
+
+            function fitText(element, container) {
+                let minimum = getCSSFontValue(element, "--font-min");
+
+                let maximum = getCSSFontValue(element, "--font-max");
+
+                /*
+        Seguridad por si no encuentra
+        las variables CSS.
+    */
+
+                if (isNaN(minimum)) {
+                    minimum = 10;
+                }
+
+                if (isNaN(maximum)) {
+                    maximum = 100;
+                }
+
+                let low = minimum;
+
+                let high = maximum;
+
+                let best = minimum;
+
+                while (low <= high) {
+                    const middle = Math.floor((low + high) / 2);
+
+                    element.style.fontSize = middle + "px";
+
+                    const fitsWidth = element.scrollWidth <= container.clientWidth;
+
+                    const fitsHeight = element.scrollHeight <= container.clientHeight;
+
+                    if (fitsWidth && fitsHeight) {
+                        best = middle;
+
+                        low = middle + 1;
+                    } else {
+                        high = middle - 1;
+                    }
+                }
+
+                element.style.fontSize = best + "px";
+            }
+
+            /* ================================================================
+   AJUSTAR NÚMERO
+================================================================ */
+
+            function fitNumber() {
+                fitText(
+                    daysNumber,
+
+                    numberGrid
+                );
+            }
+
+            /* ================================================================
+   AJUSTAR DÍA / DÍAS
+================================================================ */
+
+            function fitDaysLabel() {
+                fitText(
+                    daysLabel,
+
+                    daysPill
+                );
+            }
+
+            /* ================================================================
+   AJUSTAR FRASE
+================================================================ */
+
+            function fitPhrase() {
+                fitText(
+                    phraseElement,
+
+                    phraseGrid
+                );
+            }
+
+            /* ================================================================
+   ACTUALIZAR CONTADOR
+================================================================ */
+
+            function updateCountdown() {
+                const remainingDays = calculateRemainingDays();
+
+                /*
+        NÚMERO
+    */
+
+                daysNumber.textContent = remainingDays;
+
+                /*
+        CAMBIO AUTOMÁTICO:
+
+        1 = DÍA
+
+        cualquier otro número = DÍAS
+    */
+
+                if (remainingDays === 1) {
+                    daysLabel.textContent = "DÍA";
+                } else {
+                    daysLabel.textContent = "DÍAS";
+                }
+
+                /*
+        Esperar a que el navegador
+        actualice el contenido.
+    */
+
+                requestAnimationFrame(() => {
+                    fitNumber();
+
+                    fitDaysLabel();
+                });
+            }
+
+            /* ================================================================
+   ROTACIÓN DE FRASES
+================================================================ */
+
+            let currentPhraseIndex = Math.floor(Math.random() * phrases.length);
+
+            function showPhrase(index) {
+                phraseElement.textContent = phrases[index];
+
+                requestAnimationFrame(() => {
+                    fitPhrase();
+                });
+            }
+
+            /* ================================================================
+   SIGUIENTE FRASE
+================================================================ */
+
+            function nextPhrase() {
+                let newIndex;
+
+                do {
+                    newIndex = Math.floor(Math.random() * phrases.length);
+                } while (newIndex === currentPhraseIndex && phrases.length > 1);
+
+                currentPhraseIndex = newIndex;
+
+                showPhrase(currentPhraseIndex);
+            }
+            /* ================================================================
+   INICIALIZACIÓN
+================================================================ */
+
+            async function initialize() {
+                /*
+        Esperamos que Alphabet Soup cargue
+        antes de medir los textos.
+    */
+
+                if (document.fonts) {
+                    try {
+                        await document.fonts.ready;
+                    } catch (error) {
+                        console.log("No fue posible esperar la fuente.");
+                    }
+                }
+
+                /*
+        Contador
+    */
+
+                updateCountdown();
+
+                /*
+        Primera frase
+    */
+
+                showPhrase(currentPhraseIndex);
+
+                /*
+        Cambiar frase cada 60 segundos
+    */
+
+                setInterval(
+                    nextPhrase,
+
+                    PHRASE_INTERVAL
+                );
+
+                /*
+        Revisar contador cada minuto
+        para detectar automáticamente
+        el cambio de fecha.
+    */
+
+                setInterval(
+                    updateCountdown,
+
+                    60000
+                );
+            }
+
+            /* ================================================================
+   EJECUTAR
+================================================================ */
+
+            initialize();
+        </script>
+    </body>
+</html>
