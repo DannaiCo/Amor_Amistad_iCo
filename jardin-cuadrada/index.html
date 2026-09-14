@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=768, height=768, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <title>Dedicatorias</title>
+
+    <!-- FUENTE ROONEY SANS -->
+    <link rel="stylesheet" href="https://use.typekit.net/vsp7vcb.css" />
+
+    <style>
+      /* =========================================================
+       RESET
+    ========================================================= */
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+
+        width: 768px;
+        height: 768px;
+
+        overflow: hidden;
+
+        background: #ffccdd;
+
+        touch-action: none;
+
+        user-select: none;
+        -webkit-user-select: none;
+
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      /* =========================================================
+       ESCENARIO PRINCIPAL
+       RESOLUCIÓN FIJA 768px x 768px
+    ========================================================= */
+
+      #stage {
+        position: absolute;
+
+        top: 0;
+        left: 0;
+
+        width: 768px;
+        height: 768px;
+
+        overflow: hidden;
+
+        background: #ffccdd;
+      }
+
+      /* =========================================================
+       VIDEOS DE FONDO
+    ========================================================= */
+
+      .background-video {
+        position: absolute;
+
+        top: 0;
+        left: 0;
+
+        width: 768px;
+        height: 768px;
+
+        object-fit: cover;
+
+        opacity: 0;
+
+        transition: opacity 350ms ease-in-out;
+
+        pointer-events: none;
+
+        will-change: opacity;
+      }
+
+      .background-video.visible {
+        opacity: 1;
+      }
+
+      /* =========================================================
+       CONTENEDOR DEL NOMBRE
+    ========================================================= */
+
+      #nombre-container {
+        position: absolute;
+
+        left: 640px;
+        top: 360px;
+
+        width: 1000px;
+
+        transform: translate(-50%, -50%) rotate(-6deg);
+
+        z-index: 10;
+
+        pointer-events: none;
+      }
+
+      /* =========================================================
+       NOMBRE
+    ========================================================= */
+
+      #nombre {
+        width: 100%;
+
+        margin: 0;
+        padding: 0;
+
+        font-family: "rooney-sans", sans-serif;
+        font-weight: 900;
+        font-style: normal;
+
+        font-size: 90px;
+
+        line-height: 0.95;
+
+        letter-spacing: -4px;
+
+        text-align: center;
+
+        opacity: 0;
+
+        transform: translateY(30px) scale(0.95);
+      }
+
+      /* =========================================================
+       ANIMACIÓN DEL NOMBRE
+    ========================================================= */
+
+      #nombre.animar {
+        animation: entradaNombre 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @keyframes entradaNombre {
+        0% {
+          opacity: 0;
+
+          transform: translateY(30px) scale(0.94);
+        }
+
+        65% {
+          opacity: 1;
+
+          transform: translateY(-5px) scale(1.015);
+        }
+
+        100% {
+          opacity: 1;
+
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      /* =========================================================
+       MENSAJE DE ESTADO
+    ========================================================= */
+
+      #estado {
+        position: absolute;
+
+        left: 50%;
+        bottom: 40px;
+
+        transform: translateX(-50%);
+
+        z-index: 20;
+
+        font-family: Arial, sans-serif;
+
+        font-size: 20px;
+
+        color: rgba(255, 255, 255, 0.6);
+
+        opacity: 0;
+
+        pointer-events: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main id="stage">
+      <!-- =====================================================
+         VIDEO 1
+    ====================================================== -->
+
+      <video id="videoA" class="background-video" muted loop playsinline preload="auto"></video>
+
+      <!-- =====================================================
+         VIDEO 2
+         Se utiliza para hacer la transición entre fondos.
+    ====================================================== -->
+
+      <video id="videoB" class="background-video" muted loop playsinline preload="auto"></video>
+
+      <!-- =====================================================
+         NOMBRE
+    ====================================================== -->
+
+      <div id="nombre-container">
+        <div id="nombre"></div>
+      </div>
+
+      <!-- =====================================================
+         ESTADO
+    ====================================================== -->
+
+      <div id="estado">Esperando mensajes aprobados...</div>
+    </main>
+
+    <script>
+      const nombreContainer = document.getElementById("nombre-container");
+      /* =========================================================
+       URL DE GOOGLE APPS SCRIPT
+    ========================================================= */
+
+      const API_URL =
+        "https://script.google.com/macros/s/AKfycbwhf1ympD-ROuGCg9DhNkbvARi_b0W_3LUtuUv6Sj4YL7gJD3qF4XhfC46yKtRjLm3y/exec";
+
+      /* =========================================================
+       TIEMPO ENTRE CADA RESPUESTA
+       10 segundos
+    ========================================================= */
+
+      const TIEMPO_CAMBIO = 10000;
+
+      /* =========================================================
+       DURACIÓN DEL FADE ENTRE VIDEOS
+    ========================================================= */
+
+      const TIEMPO_FADE = 350;
+
+      /* =========================================================
+       CONFIGURACIÓN DE CATEGORÍAS
+    ========================================================= */
+
+      const CATEGORIAS = {
+        pareja: {
+          video: "Fondos/pareja.mp4",
+          color: "#770222",
+
+          x: 500,
+          y: 230,
+          align: "center"
+        },
+
+        familia: {
+          video: "Fondos/familia.mp4",
+          color: "#871f0b",
+
+          x: 500,
+          y: 210,
+          align: "center"
+        },
+
+        arrocito: {
+          video: "Fondos/arrocito.mp4",
+          color: "#053a21",
+
+          x: 500,
+          y: 250,
+          align: "center"
+        },
+
+        amigos: {
+          video: "Fondos/amigos.mp4",
+          color: "#300194",
+
+          x: 500,
+          y: 220,
+          align: "center"
+        }
+      };
+      /* =========================================================
+       ELEMENTOS HTML
+    ========================================================= */
+
+      const nombreElemento = document.getElementById("nombre");
+
+      const estadoElemento = document.getElementById("estado");
+
+      const videos = [document.getElementById("videoA"), document.getElementById("videoB")];
+
+      /* =========================================================
+       VARIABLES
+    ========================================================= */
+
+      let videoActivo = -1;
+
+      let fondoActual = null;
+
+      let mensajeActual = null;
+
+      let cambiando = false;
+
+      /* =========================================================
+       NORMALIZAR TEXTO
+    ========================================================= */
+
+      function normalizarTexto(texto) {
+        return String(texto || "")
+          .trim()
+
+          .toLowerCase()
+
+          .normalize("NFD")
+
+          .replace(/[\u0300-\u036f]/g, "");
+      }
+
+      /* =========================================================
+       DETECTAR LA CATEGORÍA
+    ========================================================= */
+
+      function obtenerTipo(mensaje) {
+        /*
+        PRIMERO BUSCAMOS "tipo".
+
+        Ejemplo recibido desde Apps Script:
+
+        tipo: "pareja"
+      */
+
+        const tipoDirecto = normalizarTexto(mensaje.tipo);
+
+        if (CATEGORIAS[tipoDirecto]) {
+          return tipoDirecto;
+        }
+
+        /*
+        SI NO EXISTE "tipo",
+        BUSCAMOS EN "categoria".
+      */
+
+        const categoria = normalizarTexto(mensaje.categoria);
+
+        if (categoria.includes("pareja")) {
+          return "pareja";
+        }
+
+        if (categoria.includes("familia")) {
+          return "familia";
+        }
+
+        if (categoria.includes("arrocito")) {
+          return "arrocito";
+        }
+
+        if (categoria.includes("amigos")) {
+          return "amigos";
+        }
+
+        return null;
+      }
+
+      /* =========================================================
+       OBTENER ID ÚNICO DEL MENSAJE
+    ========================================================= */
+
+      function obtenerIdMensaje(mensaje) {
+        if (mensaje.id !== undefined && mensaje.id !== null) {
+          return String(mensaje.id);
+        }
+
+        return normalizarTexto(mensaje.nombre) + "|" + normalizarTexto(mensaje.categoria);
+      }
+
+      /* =========================================================
+       CONSULTAR GOOGLE APPS SCRIPT
+       UTILIZANDO JSONP
+    ========================================================= */
+
+      function consultarMensajes() {
+        return new Promise(
+          (
+            resolve,
+
+            reject
+          ) => {
+            const callbackName = "__googleCallback_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
+
+            const script = document.createElement("script");
+
+            let terminado = false;
+
+            /* ===================================================
+             TIMEOUT
+          =================================================== */
+
+            const timeout = setTimeout(
+              function () {
+                limpiar();
+
+                reject(new Error("Google Apps Script tardó demasiado en responder."));
+              },
+
+              10000
+            );
+
+            /* ===================================================
+             LIMPIEZA
+          =================================================== */
+
+            function limpiar() {
+              if (terminado) {
+                return;
+              }
+
+              terminado = true;
+
+              clearTimeout(timeout);
+
+              if (script.parentNode) {
+                script.parentNode.removeChild(script);
+              }
+
+              try {
+                delete window[callbackName];
+              } catch (error) {
+                window[callbackName] = undefined;
+              }
+            }
+
+            /* ===================================================
+             CALLBACK DE GOOGLE
+          =================================================== */
+
+            window[callbackName] = function (datos) {
+              if (terminado) {
+                return;
+              }
+
+              const resultado = datos;
+
+              limpiar();
+
+              resolve(resultado);
+            };
+
+            /* ===================================================
+             ERROR
+          =================================================== */
+
+            script.onerror = function () {
+              limpiar();
+
+              reject(new Error("No fue posible conectar con Google Apps Script."));
+            };
+
+            /* ===================================================
+             URL FINAL
+          =================================================== */
+
+            script.src = API_URL + "?modo=todos" + "&callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
+
+            document.head.appendChild(script);
+          }
+        );
+      }
+
+      /* =========================================================
+       ELEGIR UNA RESPUESTA ALEATORIA
+    ========================================================= */
+
+      function elegirAleatorio(mensajes) {
+        if (mensajes.length === 0) {
+          return null;
+        }
+
+        if (mensajes.length === 1) {
+          return mensajes[0];
+        }
+
+        let candidatos = mensajes;
+
+        /*
+        Evita repetir inmediatamente
+        exactamente la misma respuesta.
+      */
+
+        if (mensajeActual !== null) {
+          candidatos = mensajes.filter(function (mensaje) {
+            return obtenerIdMensaje(mensaje) !== mensajeActual;
+          });
+
+          if (candidatos.length === 0) {
+            candidatos = mensajes;
+          }
+        }
+
+        const indice = Math.floor(Math.random() * candidatos.length);
+
+        return candidatos[indice];
+      }
+
+      /* =========================================================
+       PREPARAR VIDEO
+    ========================================================= */
+
+      function prepararVideo(video, archivo) {
+        return new Promise(function (resolve) {
+          /*
+            Si este video ya tiene cargado
+            ese archivo, no lo cargamos otra vez.
+          */
+
+          if (video.dataset.archivo === archivo && video.readyState >= 2) {
+            resolve();
+
+            return;
+          }
+
+          let terminado = false;
+
+          function listo() {
+            if (terminado) {
+              return;
+            }
+
+            terminado = true;
+
+            limpiar();
+
+            resolve();
+          }
+
+          function limpiar() {
+            video.removeEventListener(
+              "canplay",
+
+              listo
+            );
+
+            video.removeEventListener(
+              "loadeddata",
+
+              listo
+            );
+          }
+
+          video.addEventListener(
+            "canplay",
+
+            listo
+          );
+
+          video.addEventListener(
+            "loadeddata",
+
+            listo
+          );
+
+          /*
+            Protección si tarda demasiado
+            en cargar.
+          */
+
+          setTimeout(
+            listo,
+
+            3000
+          );
+
+          video.src = archivo;
+
+          video.dataset.archivo = archivo;
+
+          video.load();
+        });
+      }
+
+      /* =========================================================
+       CAMBIAR EL FONDO
+    ========================================================= */
+
+      async function cambiarFondo(archivo) {
+        /*
+        Si la categoría siguiente usa
+        exactamente el mismo fondo,
+        no hacemos crossfade.
+      */
+
+        if (archivo === fondoActual && videoActivo !== -1) {
+          const video = videos[videoActivo];
+
+          try {
+            await video.play();
+          } catch (error) {
+            console.warn(error);
+          }
+
+          return;
+        }
+
+        /*
+        Seleccionar el reproductor oculto.
+      */
+
+        const nuevoIndice = videoActivo === 0 ? 1 : 0;
+
+        const videoNuevo = videos[nuevoIndice];
+
+        await prepararVideo(
+          videoNuevo,
+
+          archivo
+        );
+
+        /*
+        Reiniciar el video.
+      */
+
+        try {
+          videoNuevo.currentTime = 0;
+        } catch (error) {
+          console.warn(error);
+        }
+
+        /*
+        Comenzar reproducción.
+      */
+
+        try {
+          await videoNuevo.play();
+        } catch (error) {
+          console.warn(
+            "Autoplay bloqueado:",
+
+            error
+          );
+        }
+
+        /*
+        Mostrar el nuevo video.
+      */
+
+        videoNuevo.classList.add("visible");
+
+        /*
+        Ocultar el anterior.
+      */
+
+        if (videoActivo !== -1) {
+          const videoAnterior = videos[videoActivo];
+
+          videoAnterior.classList.remove("visible");
+
+          /*
+          Detenerlo después de finalizar
+          el fade.
+        */
+
+          setTimeout(
+            function () {
+              if (videoActivo !== videos.indexOf(videoAnterior)) {
+                videoAnterior.pause();
+              }
+            },
+
+            TIEMPO_FADE + 100
+          );
+        }
+
+        videoActivo = nuevoIndice;
+
+        fondoActual = archivo;
+      }
+
+      /* =========================================================
+       MOSTRAR Y ANIMAR EL NOMBRE
+    ========================================================= */
+
+      function mostrarNombre(nombre, configuracion) {
+        nombreElemento.classList.remove("animar");
+
+        void nombreElemento.offsetWidth;
+
+        // NOMBRE
+        nombreElemento.textContent = nombre;
+
+        // COLOR
+        nombreElemento.style.color = configuracion.color;
+
+        // POSICIÓN
+        nombreContainer.style.left = configuracion.x + "px";
+
+        nombreContainer.style.top = configuracion.y + "px";
+
+        // ALINEACIÓN
+        nombreElemento.style.textAlign = configuracion.align || "center";
+
+        // ANIMACIÓN
+        nombreElemento.classList.add("animar");
+      }
+      /* =========================================================
+       MOSTRAR MENSAJE
+    ========================================================= */
+
+      async function mostrarMensaje(mensaje) {
+        const tipo = obtenerTipo(mensaje);
+
+        if (!tipo) {
+          console.warn(
+            "Categoría desconocida:",
+
+            mensaje
+          );
+
+          return;
+        }
+
+        const configuracion = CATEGORIAS[tipo];
+
+        /*
+        Cambiar fondo.
+      */
+
+        await cambiarFondo(configuracion.video);
+
+        /*
+        Cambiar nombre.
+      */
+
+        mostrarNombre(String(mensaje.nombre || "").trim(), configuracion);
+        /*
+        Guardamos el ID
+        para evitar repetición inmediata.
+      */
+
+        mensajeActual = obtenerIdMensaje(mensaje);
+      }
+
+      /* =========================================================
+       CICLO PRINCIPAL
+    ========================================================= */
+
+      async function cambiarRespuesta() {
+        /*
+        Evitar consultas simultáneas.
+      */
+
+        if (cambiando) {
+          return;
+        }
+
+        cambiando = true;
+
+        try {
+          /* =====================================================
+           CONSULTAR GOOGLE SHEETS
+        ===================================================== */
+
+          const datos = await consultarMensajes();
+
+          /*
+          Validar respuesta.
+        */
+
+          if (!datos || datos.ok === false) {
+            throw new Error(datos && datos.error ? datos.error : "La respuesta recibida de Apps Script no es válida.");
+          }
+
+          /* =====================================================
+           OBTENER MENSAJES
+        ===================================================== */
+
+          const mensajesOriginales = Array.isArray(datos.mensajes) ? datos.mensajes : [];
+
+          /* =====================================================
+           FILTRAR MENSAJES VÁLIDOS
+        ===================================================== */
+
+          const mensajesValidos = mensajesOriginales.filter(function (mensaje) {
+            const nombre = String(mensaje.nombre || "").trim();
+
+            const tipo = obtenerTipo(mensaje);
+
+            return nombre !== "" && tipo !== null;
+          });
+
+          /* =====================================================
+           SI NO HAY RESPUESTAS APROBADAS
+        ===================================================== */
+
+          if (mensajesValidos.length === 0) {
+            console.warn("No hay respuestas aprobadas.");
+
+            estadoElemento.style.opacity = "1";
+
+            return;
+          }
+
+          /*
+          Ocultar mensaje de estado.
+        */
+
+          estadoElemento.style.opacity = "0";
+
+          /* =====================================================
+           SELECCIONAR ALEATORIAMENTE
+        ===================================================== */
+
+          const mensaje = elegirAleatorio(mensajesValidos);
+
+          if (mensaje) {
+            await mostrarMensaje(mensaje);
+          }
+        } catch (error) {
+          console.error(
+            "Error actualizando la pantalla:",
+
+            error
+          );
+        } finally {
+          cambiando = false;
+        }
+      }
+
+      /* =========================================================
+       BLOQUEAR ZOOM CON CTRL + RUEDA
+    ========================================================= */
+
+      document.addEventListener(
+        "wheel",
+
+        function (event) {
+          if (event.ctrlKey) {
+            event.preventDefault();
+          }
+        },
+
+        {
+          passive: false
+        }
+      );
+
+      /* =========================================================
+       BLOQUEAR ATAJOS DE ZOOM
+    ========================================================= */
+
+      document.addEventListener(
+        "keydown",
+
+        function (event) {
+          if (event.ctrlKey && (event.key === "+" || event.key === "-" || event.key === "=" || event.key === "0")) {
+            event.preventDefault();
+          }
+        }
+      );
+
+      /* =========================================================
+       BLOQUEAR PINCH ZOOM
+    ========================================================= */
+
+      document.addEventListener(
+        "gesturestart",
+
+        function (event) {
+          event.preventDefault();
+        }
+      );
+
+      document.addEventListener(
+        "gesturechange",
+
+        function (event) {
+          event.preventDefault();
+        }
+      );
+
+      document.addEventListener(
+        "gestureend",
+
+        function (event) {
+          event.preventDefault();
+        }
+      );
+
+      /* =========================================================
+       INICIAR
+    ========================================================= */
+
+      /*
+      Mostrar inmediatamente
+      una respuesta aprobada.
+    */
+
+      cambiarRespuesta();
+
+      /*
+      Cambiar aleatoriamente
+      cada 10 segundos.
+    */
+
+      setInterval(
+        cambiarRespuesta,
+
+        TIEMPO_CAMBIO
+      );
+    </script>
+  </body>
+</html>
