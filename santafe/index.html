@@ -3,12 +3,6 @@
 <head>
   <meta charset="UTF-8" />
 
-  <!--
-    IMPORTANTE:
-    Ya no se fuerza un viewport de 2560x1440.
-    El navegador usa su tamaño real y el escenario interno de 2560x1440
-    se escala automáticamente para llenar la pantalla.
-  -->
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
@@ -21,8 +15,6 @@
 
   <style>
     :root {
-      --base-width: 2560;
-      --base-height: 1440;
       --fade-video: 350ms;
     }
 
@@ -37,8 +29,6 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-
-      /* Negro para que nunca aparezca el rosado de depuración. */
       background: #000;
 
       touch-action: none;
@@ -49,10 +39,6 @@
       text-size-adjust: 100%;
     }
 
-    /*
-      VIEWPORT REAL
-      Este contenedor siempre ocupa el 100% del navegador/reproductor.
-    */
     #viewport {
       position: fixed;
       inset: 0;
@@ -63,11 +49,8 @@
     }
 
     /*
-      ESCENARIO LÓGICO 2560x1440
-
-      Todas las coordenadas del diseño continúan trabajando en 2560x1440.
-      JavaScript escala este escenario para adaptarlo al tamaño real
-      de la pantalla sin cambiar las posiciones internas.
+      Lienzo lógico fijo 2560 x 1440.
+      JavaScript lo escala al tamaño real del player.
     */
     #stage {
       position: absolute;
@@ -87,44 +70,78 @@
     }
 
     /*
-      VIDEOS DE FONDO
-      Se usan dos reproductores superpuestos para el crossfade.
+      CANVAS DE RESPALDO
+      Guarda el último frame válido del video activo.
+      Si Chrome pausa el video por ahorro de energía, este frame queda visible
+      y evita que el fondo pase a negro.
+    */
+    #fallback-canvas {
+      position: absolute;
+      inset: 0;
+
+      width: 2560px;
+      height: 1440px;
+
+      z-index: 0;
+
+      background: #000;
+
+      pointer-events: none;
+    }
+
+    /*
+      Los videos tienen src fijo: no se vuelve a cargar el archivo
+      cada 10 segundos.
     */
     .background-video {
       position: absolute;
       inset: 0;
 
-      width: 100%;
-      height: 100%;
+      width: 2560px;
+      height: 1440px;
 
       object-fit: cover;
       object-position: center center;
 
       opacity: 0;
+      z-index: 1;
 
       transition: opacity var(--fade-video) ease-in-out;
 
       pointer-events: none;
-      will-change: opacity;
 
-      /*
-        Fuerza una capa de composición propia.
-        Suele mejorar la reproducción en players/mini-PCs de señalización.
-      */
       transform: translateZ(0);
       backface-visibility: hidden;
-    }
 
-    .background-video.visible {
-      opacity: 1;
+      will-change: opacity;
     }
 
     /*
-      CONTENEDOR DEL NOMBRE
-
-      left/top son sustituidos por JavaScript según la categoría.
-      Se mantienen en coordenadas del lienzo 2560x1440.
+      El siguiente video se reproduce DETRÁS del video actual.
+      Por eso puede preparar su primer frame sin dejar hueco negro.
     */
+    .background-video.preparing {
+      opacity: 1;
+      z-index: 1;
+    }
+
+    /*
+      Video que actualmente está en pantalla.
+    */
+    .background-video.active {
+      opacity: 1;
+      z-index: 2;
+    }
+
+    /*
+      El video anterior se desvanece y revela el siguiente,
+      que ya está reproduciéndose detrás.
+    */
+    .background-video.fading {
+      opacity: 0;
+      z-index: 2;
+    }
+
     #nombre-container {
       position: absolute;
 
@@ -136,6 +153,7 @@
       transform: translate(-50%, -50%) rotate(-6deg);
 
       z-index: 10;
+
       pointer-events: none;
     }
 
@@ -187,10 +205,6 @@
       }
     }
 
-    /*
-      Mensaje de diagnóstico.
-      Normalmente permanece oculto.
-    */
     #estado {
       position: absolute;
 
@@ -202,9 +216,9 @@
       z-index: 20;
 
       font-family: Arial, sans-serif;
-      font-size: 24px;
+      font-size: 22px;
 
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(255, 255, 255, 0.75);
 
       opacity: 0;
 
@@ -219,15 +233,60 @@
 
     <main id="stage">
 
+      <canvas
+        id="fallback-canvas"
+        width="2560"
+        height="1440"
+      ></canvas>
+
       <!--
-        Un reproductor por categoría.
-        Los cuatro archivos se precargan una sola vez y no se cambia el src
-        cada 10 segundos. Esto evita la pantalla negra entre mensajes.
+        Un video fijo por categoría.
+        Importante: los archivos deben existir exactamente en /Fondos/
       -->
-      <video id="video-pareja" class="background-video" muted loop playsinline preload="auto" src="Fondos/pareja.mp4"></video>
-      <video id="video-familia" class="background-video" muted loop playsinline preload="auto" src="Fondos/familia.mp4"></video>
-      <video id="video-arrocito" class="background-video" muted loop playsinline preload="auto" src="Fondos/arrocito.mp4"></video>
-      <video id="video-amigos" class="background-video" muted loop playsinline preload="auto" src="Fondos/amigos.mp4"></video>
+
+      <video
+        id="video-pareja"
+        class="background-video"
+        muted
+        loop
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+        src="Fondos/pareja.mp4"
+      ></video>
+
+      <video
+        id="video-familia"
+        class="background-video"
+        muted
+        loop
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+        src="Fondos/familia.mp4"
+      ></video>
+
+      <video
+        id="video-arrocito"
+        class="background-video"
+        muted
+        loop
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+        src="Fondos/arrocito.mp4"
+      ></video>
+
+      <video
+        id="video-amigos"
+        class="background-video"
+        muted
+        loop
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+        src="Fondos/amigos.mp4"
+      ></video>
 
       <div id="nombre-container">
         <div id="nombre"></div>
@@ -243,32 +302,41 @@
 
   <script>
     /* =========================================================
-       CONFIGURACIÓN GENERAL
+       CONFIGURACIÓN
     ========================================================= */
 
     const BASE_WIDTH = 2560;
     const BASE_HEIGHT = 1440;
 
     /*
-      "cover" = llena toda la pantalla.
-      Si el reproductor no es exactamente 16:9, recorta mínimamente
-      arriba/abajo o a los lados, pero nunca deja franjas.
-
-      Si en algún momento necesitas ver TODO el lienzo aunque aparezcan
-      franjas negras, cambia "cover" por "contain".
+      cover:
+      llena toda la pantalla manteniendo 16:9.
     */
     const MODO_ESCALA = "cover";
 
     const API_URL =
       "https://script.google.com/macros/s/AKfycbwhf1ympD-ROuGCg9DhNkbvARi_b0W_3LUtuUv6Sj4YL7gJD3qF4XhfC46yKtRjLm3y/exec";
 
-    const TIEMPO_CAMBIO = 10000;
-    const TIEMPO_FADE = 350;
+    /*
+      El MENSAJE cambia cada 10 segundos.
+    */
+    const TIEMPO_CAMBIO_MENSAJE = 10000;
 
     /*
-      Cada x/y trabaja sobre el lienzo lógico de 2560x1440.
-      Puedes seguir moviendo cada nombre modificando estos valores.
+      La hoja se vuelve a consultar cada 30 segundos.
+      El cambio de mensaje NO depende de Internet cada 10 segundos:
+      usa una copia local de la última lista recibida.
     */
+    const TIEMPO_REFRESCO_DATOS = 30000;
+
+    /*
+      Apps Script puede demorarse.
+      El timeout de red es independiente del cambio de mensajes.
+    */
+    const TIMEOUT_API = 30000;
+
+    const TIEMPO_FADE = 350;
+
     const CATEGORIAS = {
       pareja: {
         video: "Fondos/pareja.mp4",
@@ -307,16 +375,36 @@
        ELEMENTOS
     ========================================================= */
 
-    const stage = document.getElementById("stage");
-    const nombreContainer = document.getElementById("nombre-container");
-    const nombreElemento = document.getElementById("nombre");
-    const estadoElemento = document.getElementById("estado");
+    const stage =
+      document.getElementById("stage");
+
+    const nombreContainer =
+      document.getElementById("nombre-container");
+
+    const nombreElemento =
+      document.getElementById("nombre");
+
+    const estadoElemento =
+      document.getElementById("estado");
+
+    const fallbackCanvas =
+      document.getElementById("fallback-canvas");
+
+    const fallbackContext =
+      fallbackCanvas.getContext("2d");
 
     const videosPorTipo = {
-      pareja: document.getElementById("video-pareja"),
-      familia: document.getElementById("video-familia"),
-      arrocito: document.getElementById("video-arrocito"),
-      amigos: document.getElementById("video-amigos")
+      pareja:
+        document.getElementById("video-pareja"),
+
+      familia:
+        document.getElementById("video-familia"),
+
+      arrocito:
+        document.getElementById("video-arrocito"),
+
+      amigos:
+        document.getElementById("video-amigos")
     };
 
     /* =========================================================
@@ -324,11 +412,19 @@
     ========================================================= */
 
     let tipoVideoActivo = null;
+
     let mensajeActual = null;
-    let cambiando = false;
+
+    let mensajesCache = [];
+
+    let actualizandoDatos = false;
+
+    let cambiandoMensaje = false;
+
+    let reanudandoVideo = false;
 
     /* =========================================================
-       ESCALADO DE PANTALLA
+       ESCALADO
     ========================================================= */
 
     function ajustarStageAlViewport() {
@@ -342,8 +438,11 @@
         document.documentElement.clientHeight ||
         BASE_HEIGHT;
 
-      const escalaX = viewportWidth / BASE_WIDTH;
-      const escalaY = viewportHeight / BASE_HEIGHT;
+      const escalaX =
+        viewportWidth / BASE_WIDTH;
+
+      const escalaY =
+        viewportHeight / BASE_HEIGHT;
 
       const escala =
         MODO_ESCALA === "contain"
@@ -352,17 +451,6 @@
 
       stage.style.transform =
         `translate(-50%, -50%) scale(${escala})`;
-
-      /*
-        Útil para revisar la resolución real del player con F12.
-      */
-      console.log(
-        "[PANTALLA]",
-        "viewport:",
-        viewportWidth + "x" + viewportHeight,
-        "escala:",
-        escala.toFixed(4)
-      );
     }
 
     ajustarStageAlViewport();
@@ -377,16 +465,25 @@
       ajustarStageAlViewport
     );
 
-    /*
-      Algunos players de señalización cambian el tamaño del navegador
-      unos milisegundos después de abrir la página.
-    */
-    setTimeout(ajustarStageAlViewport, 250);
-    setTimeout(ajustarStageAlViewport, 1000);
+    setTimeout(
+      ajustarStageAlViewport,
+      250
+    );
+
+    setTimeout(
+      ajustarStageAlViewport,
+      1000
+    );
 
     /* =========================================================
        UTILIDADES
     ========================================================= */
+
+    function esperar(ms) {
+      return new Promise(
+        resolve => setTimeout(resolve, ms)
+      );
+    }
 
     function normalizarTexto(texto) {
       return String(texto || "")
@@ -398,28 +495,42 @@
 
     function obtenerTipo(mensaje) {
       const tipoDirecto =
-        normalizarTexto(mensaje.tipo);
+        normalizarTexto(
+          mensaje.tipo
+        );
 
-      if (CATEGORIAS[tipoDirecto]) {
+      if (
+        CATEGORIAS[tipoDirecto]
+      ) {
         return tipoDirecto;
       }
 
       const categoria =
-        normalizarTexto(mensaje.categoria);
+        normalizarTexto(
+          mensaje.categoria
+        );
 
-      if (categoria.includes("pareja")) {
+      if (
+        categoria.includes("pareja")
+      ) {
         return "pareja";
       }
 
-      if (categoria.includes("familia")) {
+      if (
+        categoria.includes("familia")
+      ) {
         return "familia";
       }
 
-      if (categoria.includes("arrocito")) {
+      if (
+        categoria.includes("arrocito")
+      ) {
         return "arrocito";
       }
 
-      if (categoria.includes("amigos")) {
+      if (
+        categoria.includes("amigos")
+      ) {
         return "amigos";
       }
 
@@ -442,91 +553,305 @@
     }
 
     /* =========================================================
-       GOOGLE APPS SCRIPT / JSONP
+       RESPALDO DEL ÚLTIMO FRAME
+    ========================================================= */
+
+    function guardarFrame(video) {
+      if (!video) {
+        return false;
+      }
+
+      if (
+        video.readyState < 2 ||
+        !video.videoWidth ||
+        !video.videoHeight
+      ) {
+        return false;
+      }
+
+      try {
+        fallbackContext.drawImage(
+          video,
+          0,
+          0,
+          BASE_WIDTH,
+          BASE_HEIGHT
+        );
+
+        return true;
+
+      } catch (error) {
+        console.warn(
+          "[FALLBACK] No se pudo guardar el frame:",
+          error
+        );
+
+        return false;
+      }
+    }
+
+    function guardarFrameActivo() {
+      if (!tipoVideoActivo) {
+        return;
+      }
+
+      const video =
+        videosPorTipo[tipoVideoActivo];
+
+      guardarFrame(video);
+    }
+
+    /*
+      Guarda un frame reciente de forma periódica.
+      Si Chrome suspende el video, ya hay una imagen debajo.
+    */
+    setInterval(
+      guardarFrameActivo,
+      2000
+    );
+
+    /* =========================================================
+       GOOGLE APPS SCRIPT / JSONP ROBUSTO
     ========================================================= */
 
     function consultarMensajes() {
-      return new Promise((resolve, reject) => {
-        const callbackName =
-          "__googleCallback_" +
-          Date.now() +
-          "_" +
-          Math.floor(Math.random() * 1000000);
+      return new Promise(
+        (resolve, reject) => {
 
-        const script =
-          document.createElement("script");
-
-        let terminado = false;
-
-        const timeout =
-          setTimeout(() => {
-            limpiar();
-
-            reject(
-              new Error(
-                "Google Apps Script tardó demasiado en responder."
-              )
+          const callbackName =
+            "__googleCallback_" +
+            Date.now() +
+            "_" +
+            Math.floor(
+              Math.random() * 1000000
             );
-          }, 10000);
 
-        function limpiar() {
-          if (terminado) {
-            return;
+          const script =
+            document.createElement("script");
+
+          let terminado = false;
+
+          /*
+            No eliminamos inmediatamente el callback cuando ocurre timeout.
+            Si Google responde tarde, encontrará una función NO-OP
+            en vez de producir:
+            "__googleCallback_xxx is not defined".
+          */
+          function instalarCallbackVacio() {
+            window[callbackName] =
+              function () {
+                /* respuesta tardía ignorada */
+              };
+
+            setTimeout(
+              () => {
+                try {
+                  delete window[callbackName];
+                } catch (error) {
+                  window[callbackName] =
+                    undefined;
+                }
+              },
+              60000
+            );
           }
 
-          terminado = true;
-
-          clearTimeout(timeout);
-
-          if (script.parentNode) {
-            script.parentNode.removeChild(script);
+          function quitarScript() {
+            if (script.parentNode) {
+              script.parentNode.removeChild(
+                script
+              );
+            }
           }
 
-          try {
-            delete window[callbackName];
-          } catch (error) {
-            window[callbackName] = undefined;
+          const timeout =
+            setTimeout(
+              () => {
+                if (terminado) {
+                  return;
+                }
+
+                terminado = true;
+
+                instalarCallbackVacio();
+
+                /*
+                  Quitar el tag no garantiza que una petición ya iniciada
+                  se cancele. El callback vacío protege la respuesta tardía.
+                */
+                quitarScript();
+
+                reject(
+                  new Error(
+                    "Apps Script tardó más de " +
+                    TIMEOUT_API / 1000 +
+                    " segundos."
+                  )
+                );
+              },
+              TIMEOUT_API
+            );
+
+          window[callbackName] =
+            function (datos) {
+              if (terminado) {
+                return;
+              }
+
+              terminado = true;
+
+              clearTimeout(timeout);
+
+              quitarScript();
+
+              /*
+                Se deja temporalmente un callback vacío por seguridad
+                antes de borrarlo.
+              */
+              instalarCallbackVacio();
+
+              resolve(datos);
+            };
+
+          script.onerror =
+            function () {
+              if (terminado) {
+                return;
+              }
+
+              terminado = true;
+
+              clearTimeout(timeout);
+
+              instalarCallbackVacio();
+
+              quitarScript();
+
+              reject(
+                new Error(
+                  "No fue posible conectar con Google Apps Script."
+                )
+              );
+            };
+
+          script.src =
+            API_URL +
+            "?modo=todos" +
+            "&callback=" +
+            encodeURIComponent(
+              callbackName
+            ) +
+            "&_=" +
+            Date.now();
+
+          document.head.appendChild(
+            script
+          );
+        }
+      );
+    }
+
+    function validarMensajes(datos) {
+      if (
+        !datos ||
+        datos.ok === false
+      ) {
+        throw new Error(
+          datos && datos.error
+            ? datos.error
+            : "Respuesta inválida de Apps Script."
+        );
+      }
+
+      const originales =
+        Array.isArray(datos.mensajes)
+          ? datos.mensajes
+          : [];
+
+      return originales.filter(
+        mensaje => {
+          const nombre =
+            String(
+              mensaje.nombre || ""
+            ).trim();
+
+          const tipo =
+            obtenerTipo(mensaje);
+
+          return (
+            nombre !== "" &&
+            tipo !== null
+          );
+        }
+      );
+    }
+
+    /*
+      Actualiza SOLO la caché.
+      Si falla Internet o Apps Script, NO borra la caché anterior.
+    */
+    async function actualizarCacheMensajes() {
+      if (actualizandoDatos) {
+        return;
+      }
+
+      actualizandoDatos = true;
+
+      try {
+        const datos =
+          await consultarMensajes();
+
+        const nuevosMensajes =
+          validarMensajes(datos);
+
+        if (
+          nuevosMensajes.length > 0
+        ) {
+          mensajesCache =
+            nuevosMensajes.slice();
+
+          estadoElemento.style.opacity =
+            "0";
+
+          console.log(
+            "[DATOS] Mensajes aprobados:",
+            mensajesCache.length
+          );
+        } else {
+          console.warn(
+            "[DATOS] No llegaron mensajes aprobados."
+          );
+
+          /*
+            Si ya había mensajes en caché, seguimos usándolos.
+          */
+          if (!mensajesCache.length) {
+            estadoElemento.textContent =
+              "Esperando mensajes aprobados...";
+
+            estadoElemento.style.opacity =
+              "1";
           }
         }
 
-        window[callbackName] =
-          function (datos) {
-            if (terminado) {
-              return;
-            }
+      } catch (error) {
+        console.warn(
+          "[DATOS] No se pudo actualizar la hoja. Se conserva la caché anterior:",
+          error
+        );
 
-            const resultado = datos;
-
-            limpiar();
-
-            resolve(resultado);
-          };
-
-        script.onerror =
-          function () {
-            limpiar();
-
-            reject(
-              new Error(
-                "No fue posible conectar con Google Apps Script."
-              )
-            );
-          };
-
-        script.src =
-          API_URL +
-          "?modo=todos" +
-          "&callback=" +
-          encodeURIComponent(callbackName) +
-          "&_=" +
-          Date.now();
-
-        document.head.appendChild(script);
-      });
+        /*
+          MUY IMPORTANTE:
+          no se pone la pantalla en negro
+          y no se elimina el mensaje actual.
+        */
+      } finally {
+        actualizandoDatos = false;
+      }
     }
 
     /* =========================================================
-       SELECCIÓN ALEATORIA
+       ELECCIÓN ALEATORIA
     ========================================================= */
 
     function elegirAleatorio(mensajes) {
@@ -538,19 +863,25 @@
         return mensajes[0];
       }
 
-      let candidatos = mensajes;
+      let candidatos =
+        mensajes;
 
-      if (mensajeActual !== null) {
+      if (
+        mensajeActual !== null
+      ) {
         candidatos =
-          mensajes.filter((mensaje) => {
-            return (
-              obtenerIdMensaje(mensaje) !==
-              mensajeActual
-            );
-          });
+          mensajes.filter(
+            mensaje => {
+              return (
+                obtenerIdMensaje(mensaje) !==
+                mensajeActual
+              );
+            }
+          );
 
         if (!candidatos.length) {
-          candidatos = mensajes;
+          candidatos =
+            mensajes;
         }
       }
 
@@ -565,187 +896,636 @@
 
     /* =========================================================
        VIDEO
-
-       CORRECCIÓN PRINCIPAL:
-       - Cada categoría conserva su propio <video>.
-       - Los archivos se precargan una sola vez.
-       - El video anterior NO se oculta hasta que el nuevo esté
-         realmente reproduciéndose.
-       - Si el nuevo video tarda o falla, el anterior permanece visible.
     ========================================================= */
 
-    function esperarVideoListo(video, timeoutMs = 8000) {
-      return new Promise((resolve, reject) => {
-        if (video.readyState >= 3) {
-          resolve();
-          return;
-        }
+    function esperarVideoListo(
+      video,
+      timeoutMs = 10000
+    ) {
+      return new Promise(
+        (resolve, reject) => {
 
-        let terminado = false;
+          if (
+            video.readyState >= 3
+          ) {
+            resolve(true);
+            return;
+          }
 
-        const timeout = setTimeout(() => {
-          if (terminado) return;
-          terminado = true;
-          limpiar();
-          reject(new Error("El video tardó demasiado en estar listo."));
-        }, timeoutMs);
+          let terminado = false;
 
-        function limpiar() {
-          clearTimeout(timeout);
-          video.removeEventListener("canplay", listo);
-          video.removeEventListener("canplaythrough", listo);
-          video.removeEventListener("error", errorVideo);
-        }
+          const timeout =
+            setTimeout(
+              () => {
+                if (terminado) {
+                  return;
+                }
 
-        function listo() {
-          if (terminado) return;
-          terminado = true;
-          limpiar();
-          resolve();
-        }
+                terminado = true;
 
-        function errorVideo() {
-          if (terminado) return;
-          terminado = true;
-          limpiar();
-          reject(new Error("No se pudo cargar " + (video.currentSrc || video.src)));
-        }
+                limpiar();
 
-        video.addEventListener("canplay", listo, { once: true });
-        video.addEventListener("canplaythrough", listo, { once: true });
-        video.addEventListener("error", errorVideo, { once: true });
+                reject(
+                  new Error(
+                    "El video tardó demasiado en estar listo."
+                  )
+                );
+              },
+              timeoutMs
+            );
 
-        /* Si todavía no comenzó la precarga, la forzamos. */
-        if (video.readyState === 0) {
-          video.load();
-        }
-      });
-    }
+          function limpiar() {
+            clearTimeout(timeout);
 
-    function esperarPrimerFrame(video, timeoutMs = 4000) {
-      return new Promise((resolve) => {
-        let terminado = false;
+            video.removeEventListener(
+              "canplay",
+              listo
+            );
 
-        const timeout = setTimeout(() => {
-          if (terminado) return;
-          terminado = true;
-          limpiar();
-          resolve();
-        }, timeoutMs);
+            video.removeEventListener(
+              "canplaythrough",
+              listo
+            );
 
-        function limpiar() {
-          clearTimeout(timeout);
-          video.removeEventListener("playing", listo);
-          video.removeEventListener("timeupdate", listo);
-        }
+            video.removeEventListener(
+              "error",
+              errorVideo
+            );
+          }
 
-        function listo() {
-          if (terminado) return;
-          terminado = true;
-          limpiar();
-          resolve();
-        }
+          function listo() {
+            if (terminado) {
+              return;
+            }
 
-        video.addEventListener("playing", listo, { once: true });
-        video.addEventListener("timeupdate", listo, { once: true });
+            terminado = true;
 
-        if (!video.paused && video.readyState >= 3) {
-          requestAnimationFrame(() => {
-            if (!terminado) listo();
-          });
-        }
-      });
-    }
+            limpiar();
 
-    async function cambiarFondo(tipo) {
-      const videoNuevo = videosPorTipo[tipo];
+            resolve(true);
+          }
 
-      if (!videoNuevo) {
-        throw new Error("No existe video para la categoría: " + tipo);
-      }
+          function errorVideo() {
+            if (terminado) {
+              return;
+            }
 
-      /* Si la categoría no cambia, no tocamos el video. */
-      if (tipo === tipoVideoActivo) {
-        if (videoNuevo.paused) {
-          try {
-            await videoNuevo.play();
-          } catch (error) {
-            console.warn("No se pudo continuar el video:", error);
+            terminado = true;
+
+            limpiar();
+
+            reject(
+              new Error(
+                "No se pudo cargar: " +
+                (
+                  video.currentSrc ||
+                  video.src
+                )
+              )
+            );
+          }
+
+          video.addEventListener(
+            "canplay",
+            listo,
+            { once: true }
+          );
+
+          video.addEventListener(
+            "canplaythrough",
+            listo,
+            { once: true }
+          );
+
+          video.addEventListener(
+            "error",
+            errorVideo,
+            { once: true }
+          );
+
+          if (
+            video.readyState === 0
+          ) {
+            video.load();
           }
         }
-        return;
+      );
+    }
+
+    async function reproducirConReintentos(
+      video,
+      intentos = 3
+    ) {
+      for (
+        let intento = 1;
+        intento <= intentos;
+        intento++
+      ) {
+        /*
+          Si la página está oculta, Chrome puede pausar
+          el video por ahorro de energía.
+          No peleamos contra el navegador mientras está oculta.
+        */
+        if (document.hidden) {
+          return false;
+        }
+
+        try {
+          await video.play();
+
+          return true;
+
+        } catch (error) {
+          console.warn(
+            "[VIDEO] Intento " +
+            intento +
+            " falló:",
+            error
+          );
+
+          if (
+            intento < intentos
+          ) {
+            await esperar(
+              400 * intento
+            );
+          }
+        }
+      }
+
+      return false;
+    }
+
+    function esperarFrameReal(
+      video,
+      timeoutMs = 5000
+    ) {
+      return new Promise(
+        resolve => {
+
+          let terminado = false;
+
+          let frameCallbackId = null;
+
+          const timeout =
+            setTimeout(
+              () => finalizar(false),
+              timeoutMs
+            );
+
+          function finalizar(ok) {
+            if (terminado) {
+              return;
+            }
+
+            terminado = true;
+
+            clearTimeout(timeout);
+
+            video.removeEventListener(
+              "playing",
+              onPlaying
+            );
+
+            video.removeEventListener(
+              "timeupdate",
+              onTimeUpdate
+            );
+
+            resolve(ok);
+          }
+
+          function onPlaying() {
+            /*
+              "playing" significa que el reproductor avanzó,
+              pero esperamos un frame de composición si Chromium lo permite.
+            */
+            if (
+              typeof video.requestVideoFrameCallback ===
+              "function"
+            ) {
+              frameCallbackId =
+                video.requestVideoFrameCallback(
+                  () => finalizar(true)
+                );
+            } else {
+              requestAnimationFrame(
+                () => finalizar(true)
+              );
+            }
+          }
+
+          function onTimeUpdate() {
+            if (
+              video.readyState >= 2 &&
+              !video.paused
+            ) {
+              finalizar(true);
+            }
+          }
+
+          video.addEventListener(
+            "playing",
+            onPlaying,
+            { once: true }
+          );
+
+          video.addEventListener(
+            "timeupdate",
+            onTimeUpdate
+          );
+
+          /*
+            Si ya está reproduciendo, pedimos directamente
+            el próximo frame.
+          */
+          if (
+            !video.paused &&
+            video.readyState >= 2
+          ) {
+            if (
+              typeof video.requestVideoFrameCallback ===
+              "function"
+            ) {
+              frameCallbackId =
+                video.requestVideoFrameCallback(
+                  () => finalizar(true)
+                );
+            } else {
+              requestAnimationFrame(
+                () => finalizar(true)
+              );
+            }
+          }
+        }
+      );
+    }
+
+    /*
+      Devuelve TRUE solamente si el fondo nuevo quedó listo.
+      Si falla, el fondo y el nombre anteriores permanecen intactos.
+    */
+    async function cambiarFondo(tipo) {
+      const videoNuevo =
+        videosPorTipo[tipo];
+
+      if (!videoNuevo) {
+        return false;
       }
 
       /*
-        Primero cargamos y arrancamos el video nuevo, pero SIN ocultar
-        todavía el actual. De esta forma nunca aparece un hueco negro.
+        Mismo fondo/categoría:
+        no se hace transición.
       */
-      try {
-        await esperarVideoListo(videoNuevo);
-      } catch (error) {
-        console.error("[VIDEO] No está listo:", error);
-        return;
+      if (
+        tipo === tipoVideoActivo
+      ) {
+        if (
+          videoNuevo.paused &&
+          !document.hidden
+        ) {
+          guardarFrame(videoNuevo);
+
+          const ok =
+            await reproducirConReintentos(
+              videoNuevo
+            );
+
+          if (ok) {
+            await esperarFrameReal(
+              videoNuevo,
+              3000
+            );
+
+            videoNuevo.classList.add(
+              "active"
+            );
+          }
+        }
+
+        return true;
       }
+
+      /*
+        Si la pestaña/player está oculto,
+        NO se cambia de fondo.
+        Esta es precisamente una condición en la que Chromium
+        puede abortar play() para ahorrar energía.
+      */
+      if (document.hidden) {
+        console.warn(
+          "[VIDEO] Página oculta: se pospone el cambio."
+        );
+
+        return false;
+      }
+
+      const tipoAnterior =
+        tipoVideoActivo;
+
+      const videoAnterior =
+        tipoAnterior
+          ? videosPorTipo[tipoAnterior]
+          : null;
+
+      /*
+        Antes de cualquier cambio guardamos el frame actual.
+      */
+      if (videoAnterior) {
+        guardarFrame(
+          videoAnterior
+        );
+      }
+
+      try {
+        await esperarVideoListo(
+          videoNuevo
+        );
+      } catch (error) {
+        console.warn(
+          "[VIDEO] El siguiente fondo no está listo:",
+          error
+        );
+
+        return false;
+      }
+
+      /*
+        El nuevo video queda DETRÁS del actual y completamente opaco.
+        No hay un hueco negro entre ambos.
+      */
+      videoNuevo.classList.remove(
+        "fading",
+        "active"
+      );
+
+      videoNuevo.classList.add(
+        "preparing"
+      );
 
       try {
         videoNuevo.currentTime = 0;
       } catch (error) {}
 
-      try {
-        await videoNuevo.play();
-      } catch (error) {
-        console.error("[VIDEO] No se pudo reproducir:", error);
-        return;
+      const pudoReproducir =
+        await reproducirConReintentos(
+          videoNuevo
+        );
+
+      if (!pudoReproducir) {
+        videoNuevo.classList.remove(
+          "preparing"
+        );
+
+        return false;
       }
 
-      /* Esperamos a que exista un frame reproducible. */
-      await esperarPrimerFrame(videoNuevo);
+      const tieneFrame =
+        await esperarFrameReal(
+          videoNuevo
+        );
 
-      const tipoAnterior = tipoVideoActivo;
-      const videoAnterior = tipoAnterior ? videosPorTipo[tipoAnterior] : null;
+      if (!tieneFrame) {
+        console.warn(
+          "[VIDEO] No apareció un frame nuevo; se conserva el fondo anterior."
+        );
 
-      /* Mostrar el nuevo. */
-      videoNuevo.classList.add("visible");
+        videoNuevo.pause();
+
+        videoNuevo.classList.remove(
+          "preparing"
+        );
+
+        return false;
+      }
 
       /*
-        En el siguiente frame empezamos a ocultar el anterior.
-        Durante el crossfade ambos permanecen visibles.
+        Actualizamos la imagen de seguridad con el fondo nuevo.
       */
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (videoAnterior && videoAnterior !== videoNuevo) {
-            videoAnterior.classList.remove("visible");
+      guardarFrame(
+        videoNuevo
+      );
 
-            setTimeout(() => {
-              /* Solo se pausa si sigue sin ser el activo. */
-              if (tipoVideoActivo !== tipoAnterior) {
-                videoAnterior.pause();
-              }
-            }, TIEMPO_FADE + 150);
-          }
-        });
-      });
+      /*
+        Si no había video anterior,
+        simplemente activamos el nuevo.
+      */
+      if (!videoAnterior) {
+        videoNuevo.classList.remove(
+          "preparing"
+        );
 
-      tipoVideoActivo = tipo;
+        videoNuevo.classList.add(
+          "active"
+        );
+
+        tipoVideoActivo =
+          tipo;
+
+        return true;
+      }
+
+      /*
+        El nuevo ya está reproduciéndose DETRÁS.
+        Desvanecemos el anterior para revelarlo.
+      */
+      videoAnterior.classList.add(
+        "fading"
+      );
+
+      await esperar(
+        TIEMPO_FADE + 80
+      );
+
+      /*
+        Ahora el nuevo pasa a ser el activo.
+      */
+      videoNuevo.classList.remove(
+        "preparing"
+      );
+
+      videoNuevo.classList.add(
+        "active"
+      );
+
+      /*
+        El anterior ya puede salir.
+      */
+      videoAnterior.classList.remove(
+        "active",
+        "fading",
+        "preparing"
+      );
+
+      videoAnterior.pause();
+
+      tipoVideoActivo =
+        tipo;
+
+      return true;
     }
 
     /*
-      Precarga temprana de los cuatro videos.
-      No los reproducimos todos simultáneamente; solo se descargan/decodifican
-      lo suficiente para que el primer cambio sea rápido.
+      Precarga inicial.
+      NO intentamos reproducir los cuatro videos a la vez.
     */
-    Object.entries(videosPorTipo).forEach(([tipo, video]) => {
-      video.load();
+    Object.entries(
+      videosPorTipo
+    ).forEach(
+      ([tipo, video]) => {
+        video.load();
 
-      video.addEventListener("error", () => {
-        console.error(
-          "[VIDEO ERROR]",
-          tipo,
-          video.currentSrc || video.src,
-          video.error
+        video.addEventListener(
+          "error",
+          () => {
+            console.error(
+              "[VIDEO ERROR]",
+              tipo,
+              video.currentSrc ||
+              video.src,
+              video.error
+            );
+          }
         );
-      });
-    });
+
+        /*
+          Si Chrome pausa el video ACTIVO,
+          guardamos su último frame.
+        */
+        video.addEventListener(
+          "pause",
+          () => {
+            if (
+              tipo === tipoVideoActivo
+            ) {
+              guardarFrame(
+                video
+              );
+            }
+          }
+        );
+      }
+    );
+
+    /* =========================================================
+       REANUDACIÓN DEL VIDEO ACTIVO
+    ========================================================= */
+
+    async function reanudarVideoActivo() {
+      if (
+        reanudandoVideo ||
+        document.hidden ||
+        !tipoVideoActivo
+      ) {
+        return;
+      }
+
+      const video =
+        videosPorTipo[
+          tipoVideoActivo
+        ];
+
+      if (
+        !video ||
+        !video.paused
+      ) {
+        return;
+      }
+
+      reanudandoVideo =
+        true;
+
+      try {
+        /*
+          Mientras se intenta reanudar,
+          quitamos temporalmente el video para que se vea
+          el canvas con el último frame válido y no un cuadro negro.
+        */
+        guardarFrame(
+          video
+        );
+
+        video.classList.remove(
+          "active"
+        );
+
+        const ok =
+          await reproducirConReintentos(
+            video,
+            4
+          );
+
+        if (ok) {
+          const frameOk =
+            await esperarFrameReal(
+              video,
+              5000
+            );
+
+          if (frameOk) {
+            guardarFrame(
+              video
+            );
+
+            video.classList.add(
+              "active"
+            );
+          }
+        }
+
+      } finally {
+        reanudandoVideo =
+          false;
+      }
+    }
+
+    /*
+      Si Chrome/player vuelve a primer plano,
+      reanuda el video antes de hacer un nuevo cambio.
+    */
+    document.addEventListener(
+      "visibilitychange",
+      async () => {
+        if (document.hidden) {
+          guardarFrameActivo();
+
+          return;
+        }
+
+        await esperar(250);
+
+        await reanudarVideoActivo();
+      }
+    );
+
+    /*
+      Watchdog:
+      si el video activo se detiene inesperadamente mientras la
+      página está visible, intenta reanudarlo.
+    */
+    setInterval(
+      () => {
+        if (
+          document.hidden ||
+          !tipoVideoActivo
+        ) {
+          return;
+        }
+
+        const video =
+          videosPorTipo[
+            tipoVideoActivo
+          ];
+
+        if (
+          video &&
+          video.paused
+        ) {
+          reanudarVideoActivo();
+        }
+      },
+      1500
+    );
 
     /* =========================================================
        NOMBRE
@@ -774,7 +1554,8 @@
         configuracion.y + "px";
 
       nombreElemento.style.textAlign =
-        configuracion.align || "center";
+        configuracion.align ||
+        "center";
 
       nombreElemento.classList.add(
         "animar"
@@ -785,104 +1566,73 @@
        MOSTRAR MENSAJE
     ========================================================= */
 
-    async function mostrarMensaje(mensaje) {
+    async function mostrarMensaje(
+      mensaje
+    ) {
       const tipo =
-        obtenerTipo(mensaje);
-
-      if (!tipo) {
-        console.warn(
-          "Categoría desconocida:",
+        obtenerTipo(
           mensaje
         );
 
-        return;
+      if (!tipo) {
+        return false;
       }
 
       const configuracion =
         CATEGORIAS[tipo];
 
-      await cambiarFondo(
-        tipo
-      );
+      /*
+        No cambiamos nombre hasta saber que el fondo
+        correspondiente quedó listo.
+      */
+      const fondoOk =
+        await cambiarFondo(
+          tipo
+        );
+
+      if (!fondoOk) {
+        console.warn(
+          "[MENSAJE] Se mantiene el mensaje anterior porque el nuevo fondo no pudo reproducirse."
+        );
+
+        return false;
+      }
 
       mostrarNombre(
-        String(mensaje.nombre || "").trim(),
+        String(
+          mensaje.nombre || ""
+        ).trim(),
         configuracion
       );
 
       mensajeActual =
-        obtenerIdMensaje(mensaje);
+        obtenerIdMensaje(
+          mensaje
+        );
+
+      return true;
     }
 
     /* =========================================================
-       CICLO PRINCIPAL
+       ROTACIÓN CADA 10 SEGUNDOS
     ========================================================= */
 
-    async function cambiarRespuesta() {
-      if (cambiando) {
+    async function cambiarMensajeDesdeCache() {
+      if (
+        cambiandoMensaje ||
+        document.hidden ||
+        !mensajesCache.length
+      ) {
         return;
       }
 
-      cambiando = true;
+      cambiandoMensaje =
+        true;
 
       try {
-        const datos =
-          await consultarMensajes();
-
-        if (
-          !datos ||
-          datos.ok === false
-        ) {
-          throw new Error(
-            datos && datos.error
-              ? datos.error
-              : "La respuesta recibida de Apps Script no es válida."
-          );
-        }
-
-        const mensajesOriginales =
-          Array.isArray(datos.mensajes)
-            ? datos.mensajes
-            : [];
-
-        const mensajesValidos =
-          mensajesOriginales.filter(
-            (mensaje) => {
-              const nombre =
-                String(
-                  mensaje.nombre || ""
-                ).trim();
-
-              const tipo =
-                obtenerTipo(mensaje);
-
-              return (
-                nombre !== "" &&
-                tipo !== null
-              );
-            }
-          );
-
-        if (!mensajesValidos.length) {
-          console.warn(
-            "No hay respuestas aprobadas."
-          );
-
-          estadoElemento.textContent =
-            "Esperando mensajes aprobados...";
-
-          estadoElemento.style.opacity =
-            "1";
-
-          return;
-        }
-
-        estadoElemento.style.opacity =
-          "0";
-
         const mensaje =
           elegirAleatorio(
-            mensajesValidos
+            mensajesCache
           );
 
         if (mensaje) {
@@ -892,26 +1642,52 @@
         }
 
       } catch (error) {
-        console.error(
-          "Error actualizando la pantalla:",
+        console.warn(
+          "[MENSAJE] No se pudo cambiar:",
           error
         );
 
-        /*
-          En producción se mantiene discreto.
-          Si necesitas diagnosticar en sitio,
-          cambia opacity a 1.
-        */
-        estadoElemento.textContent =
-          "Error: " + error.message;
-
-        estadoElemento.style.opacity =
-          "0";
-
       } finally {
-        cambiando = false;
+        cambiandoMensaje =
+          false;
       }
     }
+
+    /* =========================================================
+       BUCLES
+    ========================================================= */
+
+    async function iniciar() {
+      /*
+        Carga inicial de la hoja.
+      */
+      await actualizarCacheMensajes();
+
+      /*
+        Primer mensaje.
+      */
+      await cambiarMensajeDesdeCache();
+
+      /*
+        Los mensajes cambian cada 10 s usando la caché local.
+      */
+      setInterval(
+        cambiarMensajeDesdeCache,
+        TIEMPO_CAMBIO_MENSAJE
+      );
+
+      /*
+        Google Sheets se vuelve a consultar cada 30 s.
+        Si falla una consulta, la pantalla sigue funcionando
+        con la última lista válida.
+      */
+      setInterval(
+        actualizarCacheMensajes,
+        TIEMPO_REFRESCO_DATOS
+      );
+    }
+
+    iniciar();
 
     /* =========================================================
        BLOQUEO DE ZOOM
@@ -919,7 +1695,7 @@
 
     document.addEventListener(
       "wheel",
-      function (event) {
+      event => {
         if (event.ctrlKey) {
           event.preventDefault();
         }
@@ -931,7 +1707,7 @@
 
     document.addEventListener(
       "keydown",
-      function (event) {
+      event => {
         if (
           event.ctrlKey &&
           (
@@ -948,36 +1724,24 @@
 
     document.addEventListener(
       "gesturestart",
-      function (event) {
+      event => {
         event.preventDefault();
       }
     );
 
     document.addEventListener(
       "gesturechange",
-      function (event) {
+      event => {
         event.preventDefault();
       }
     );
 
     document.addEventListener(
       "gestureend",
-      function (event) {
+      event => {
         event.preventDefault();
       }
     );
-
-    /* =========================================================
-       ARRANQUE
-    ========================================================= */
-
-    cambiarRespuesta();
-
-    setInterval(
-      cambiarRespuesta,
-      TIEMPO_CAMBIO
-    );
-
   </script>
 
 </body>
