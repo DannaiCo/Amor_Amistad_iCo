@@ -219,25 +219,15 @@
 
     <main id="stage">
 
-      <video
-        id="videoA"
-        class="background-video"
-        muted
-        loop
-        autoplay
-        playsinline
-        preload="auto"
-      ></video>
-
-      <video
-        id="videoB"
-        class="background-video"
-        muted
-        loop
-        autoplay
-        playsinline
-        preload="auto"
-      ></video>
+      <!--
+        Un reproductor por categoría.
+        Los cuatro archivos se precargan una sola vez y no se cambia el src
+        cada 10 segundos. Esto evita la pantalla negra entre mensajes.
+      -->
+      <video id="video-pareja" class="background-video" muted loop playsinline preload="auto" src="Fondos/pareja.mp4"></video>
+      <video id="video-familia" class="background-video" muted loop playsinline preload="auto" src="Fondos/familia.mp4"></video>
+      <video id="video-arrocito" class="background-video" muted loop playsinline preload="auto" src="Fondos/arrocito.mp4"></video>
+      <video id="video-amigos" class="background-video" muted loop playsinline preload="auto" src="Fondos/amigos.mp4"></video>
 
       <div id="nombre-container">
         <div id="nombre"></div>
@@ -322,17 +312,18 @@
     const nombreElemento = document.getElementById("nombre");
     const estadoElemento = document.getElementById("estado");
 
-    const videos = [
-      document.getElementById("videoA"),
-      document.getElementById("videoB")
-    ];
+    const videosPorTipo = {
+      pareja: document.getElementById("video-pareja"),
+      familia: document.getElementById("video-familia"),
+      arrocito: document.getElementById("video-arrocito"),
+      amigos: document.getElementById("video-amigos")
+    };
 
     /* =========================================================
        ESTADO
     ========================================================= */
 
-    let videoActivo = -1;
-    let fondoActual = null;
+    let tipoVideoActivo = null;
     let mensajeActual = null;
     let cambiando = false;
 
@@ -574,144 +565,127 @@
 
     /* =========================================================
        VIDEO
+
+       CORRECCIÓN PRINCIPAL:
+       - Cada categoría conserva su propio <video>.
+       - Los archivos se precargan una sola vez.
+       - El video anterior NO se oculta hasta que el nuevo esté
+         realmente reproduciéndose.
+       - Si el nuevo video tarda o falla, el anterior permanece visible.
     ========================================================= */
 
-    function prepararVideo(video, archivo) {
+    function esperarVideoListo(video, timeoutMs = 8000) {
       return new Promise((resolve, reject) => {
-        if (
-          video.dataset.archivo === archivo &&
-          video.readyState >= 2
-        ) {
+        if (video.readyState >= 3) {
           resolve();
           return;
         }
 
         let terminado = false;
 
-        const timeout =
-          setTimeout(() => {
-            if (terminado) {
-              return;
-            }
-
-            terminado = true;
-            limpiar();
-
-            /*
-              No bloqueamos toda la aplicación.
-              Dejamos que play() intente reproducir igualmente.
-            */
-            console.warn(
-              "[VIDEO] Tiempo de carga alto:",
-              archivo
-            );
-
-            resolve();
-          }, 5000);
+        const timeout = setTimeout(() => {
+          if (terminado) return;
+          terminado = true;
+          limpiar();
+          reject(new Error("El video tardó demasiado en estar listo."));
+        }, timeoutMs);
 
         function limpiar() {
           clearTimeout(timeout);
-
-          video.removeEventListener(
-            "canplay",
-            listo
-          );
-
-          video.removeEventListener(
-            "loadeddata",
-            listo
-          );
-
-          video.removeEventListener(
-            "error",
-            errorVideo
-          );
+          video.removeEventListener("canplay", listo);
+          video.removeEventListener("canplaythrough", listo);
+          video.removeEventListener("error", errorVideo);
         }
 
         function listo() {
-          if (terminado) {
-            return;
-          }
-
+          if (terminado) return;
           terminado = true;
           limpiar();
           resolve();
         }
 
         function errorVideo() {
-          if (terminado) {
-            return;
-          }
-
+          if (terminado) return;
           terminado = true;
           limpiar();
-
-          const detalle =
-            video.error
-              ? " Código MediaError: " + video.error.code
-              : "";
-
-          reject(
-            new Error(
-              "No se pudo cargar el video: " +
-              archivo +
-              "." +
-              detalle
-            )
-          );
+          reject(new Error("No se pudo cargar " + (video.currentSrc || video.src)));
         }
 
-        video.addEventListener(
-          "canplay",
-          listo
-        );
+        video.addEventListener("canplay", listo, { once: true });
+        video.addEventListener("canplaythrough", listo, { once: true });
+        video.addEventListener("error", errorVideo, { once: true });
 
-        video.addEventListener(
-          "loadeddata",
-          listo
-        );
-
-        video.addEventListener(
-          "error",
-          errorVideo
-        );
-
-        video.src = archivo;
-        video.dataset.archivo = archivo;
-        video.load();
+        /* Si todavía no comenzó la precarga, la forzamos. */
+        if (video.readyState === 0) {
+          video.load();
+        }
       });
     }
 
-    async function cambiarFondo(archivo) {
-      if (
-        archivo === fondoActual &&
-        videoActivo !== -1
-      ) {
-        const video =
-          videos[videoActivo];
+    function esperarPrimerFrame(video, timeoutMs = 4000) {
+      return new Promise((resolve) => {
+        let terminado = false;
 
-        try {
-          await video.play();
-        } catch (error) {
-          console.warn(
-            "[VIDEO] No se pudo continuar:",
-            error
-          );
+        const timeout = setTimeout(() => {
+          if (terminado) return;
+          terminado = true;
+          limpiar();
+          resolve();
+        }, timeoutMs);
+
+        function limpiar() {
+          clearTimeout(timeout);
+          video.removeEventListener("playing", listo);
+          video.removeEventListener("timeupdate", listo);
         }
 
+        function listo() {
+          if (terminado) return;
+          terminado = true;
+          limpiar();
+          resolve();
+        }
+
+        video.addEventListener("playing", listo, { once: true });
+        video.addEventListener("timeupdate", listo, { once: true });
+
+        if (!video.paused && video.readyState >= 3) {
+          requestAnimationFrame(() => {
+            if (!terminado) listo();
+          });
+        }
+      });
+    }
+
+    async function cambiarFondo(tipo) {
+      const videoNuevo = videosPorTipo[tipo];
+
+      if (!videoNuevo) {
+        throw new Error("No existe video para la categoría: " + tipo);
+      }
+
+      /* Si la categoría no cambia, no tocamos el video. */
+      if (tipo === tipoVideoActivo) {
+        if (videoNuevo.paused) {
+          try {
+            await videoNuevo.play();
+          } catch (error) {
+            console.warn("No se pudo continuar el video:", error);
+          }
+        }
         return;
       }
 
-      const nuevoIndice =
-        videoActivo === 0 ? 1 : 0;
-
-      const videoNuevo =
-        videos[nuevoIndice];
-
-      await prepararVideo(
-        videoNuevo,
-        archivo
-      );
+      /*
+        Primero cargamos y arrancamos el video nuevo, pero SIN ocultar
+        todavía el actual. De esta forma nunca aparece un hueco negro.
+      */
+      try {
+        await esperarVideoListo(videoNuevo);
+      } catch (error) {
+        console.error("[VIDEO] No está listo:", error);
+        return;
+      }
 
       try {
         videoNuevo.currentTime = 0;
@@ -720,52 +694,57 @@
       try {
         await videoNuevo.play();
       } catch (error) {
-        console.warn(
-          "[VIDEO] Autoplay bloqueado:",
-          error
-        );
+        console.error("[VIDEO] No se pudo reproducir:", error);
+        return;
       }
 
-      videoNuevo.classList.add(
-        "visible"
-      );
+      /* Esperamos a que exista un frame reproducible. */
+      await esperarPrimerFrame(videoNuevo);
 
-      if (videoActivo !== -1) {
-        const videoAnterior =
-          videos[videoActivo];
+      const tipoAnterior = tipoVideoActivo;
+      const videoAnterior = tipoAnterior ? videosPorTipo[tipoAnterior] : null;
 
-        videoAnterior.classList.remove(
-          "visible"
-        );
+      /* Mostrar el nuevo. */
+      videoNuevo.classList.add("visible");
 
-        setTimeout(() => {
-          if (
-            videoActivo !==
-            videos.indexOf(videoAnterior)
-          ) {
-            videoAnterior.pause();
+      /*
+        En el siguiente frame empezamos a ocultar el anterior.
+        Durante el crossfade ambos permanecen visibles.
+      */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (videoAnterior && videoAnterior !== videoNuevo) {
+            videoAnterior.classList.remove("visible");
+
+            setTimeout(() => {
+              /* Solo se pausa si sigue sin ser el activo. */
+              if (tipoVideoActivo !== tipoAnterior) {
+                videoAnterior.pause();
+              }
+            }, TIEMPO_FADE + 150);
           }
-        }, TIEMPO_FADE + 100);
-      }
+        });
+      });
 
-      videoActivo = nuevoIndice;
-      fondoActual = archivo;
+      tipoVideoActivo = tipo;
     }
 
     /*
-      Log de errores extra por cada reproductor.
+      Precarga temprana de los cuatro videos.
+      No los reproducimos todos simultáneamente; solo se descargan/decodifican
+      lo suficiente para que el primer cambio sea rápido.
     */
-    videos.forEach((video) => {
-      video.addEventListener(
-        "error",
-        () => {
-          console.error(
-            "[VIDEO ERROR]",
-            video.currentSrc || video.src,
-            video.error
-          );
-        }
-      );
+    Object.entries(videosPorTipo).forEach(([tipo, video]) => {
+      video.load();
+
+      video.addEventListener("error", () => {
+        console.error(
+          "[VIDEO ERROR]",
+          tipo,
+          video.currentSrc || video.src,
+          video.error
+        );
+      });
     });
 
     /* =========================================================
@@ -823,7 +802,7 @@
         CATEGORIAS[tipo];
 
       await cambiarFondo(
-        configuracion.video
+        tipo
       );
 
       mostrarNombre(
